@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "title": "ORBITAL OUTPOST",
+  "description": "Recover the station with your crew in a neon 3D orbital outpost. Join a live room, coordinate the team and survive reactor overload.",
+  "defaultCaptions": {
+    "x": "ORBITAL OUTPOST — join the crew, recover the station, survive reactor overload.",
+    "facebook": "ORBITAL OUTPOST is a neon 3D recovery run with live co-op crew rooms.",
+    "reddit": "I built ORBITAL OUTPOST: a 3D orbital recovery game with a real-time co-op room.",
+    "discord": "ORBITAL OUTPOST co-op is live — pick a room code and bring your crew."
+  },
+  "assets": {
+    "favicon": "assets/share/favicon.png"
+  }
+}

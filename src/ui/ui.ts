@@ -4,15 +4,18 @@ import type { Input } from '../engine/input'
 import { insertScore, type Locale, type Quality, type SaveData, type SaveStore } from '../engine/save'
 import { CONFIG } from '../game/config'
 import type { Compass, Hint } from '../game/game'
+import type { MultiplayerState } from '../net/multiplayer'
 import { formatClock, stars, type RunState } from '../game/rules'
 
-export type Screen = 'boot' | 'title' | 'hud' | 'pause' | 'settings' | 'leaderboard' | 'results'
+export type Screen = 'boot' | 'title' | 'hud' | 'pause' | 'settings' | 'leaderboard' | 'results' | 'multiplayer'
 
 export type UiActions = {
   play(): void
   resume(): void
   restart(): void
   quit(): void
+  multiplayerJoin(room: string, name: string): void
+  multiplayerLeave(): void
   settings(patch: Partial<SaveData>): void
 }
 
@@ -46,6 +49,7 @@ export class Ui {
   private savedRank = -1
   private stormShown = false
   private lastMethod = ''
+  private multiplayerState: MultiplayerState = { status: 'idle', room: '', playerId: '', players: [], message: 'Ready to connect.' }
 
   constructor(
     private readonly i18n: I18n,
@@ -81,6 +85,7 @@ export class Ui {
   }
 
   back(): void {
+    if (this.screen === 'multiplayer') this.actions.multiplayerLeave()
     const prev = this.stack.pop()
     if (prev) this.setScreen(prev)
     else if (this.screen === 'pause') this.actions.resume()
@@ -96,6 +101,7 @@ export class Ui {
     this.root.dataset.activeScreen = screen
     if (screen === 'title') this.renderBest()
     if (screen === 'leaderboard') this.renderLeaderboard()
+    if (screen === 'multiplayer') this.renderMultiplayer()
     if (screen === 'hud') this.stormShown = false
     // Focus the first control so keyboard and gamepad players can act immediately.
     requestAnimationFrame(() => {
@@ -108,6 +114,30 @@ export class Ui {
   setBootProgress(progress: number): void {
     const bar = this.q<HTMLElement>('.boot-bar i')
     bar.style.transform = `scaleX(${Math.max(0.04, Math.min(1, progress))})`
+  }
+
+  setMultiplayerState(state: MultiplayerState): void {
+    this.multiplayerState = state
+    if (this.screen === 'multiplayer') this.renderMultiplayer()
+  }
+
+  private renderMultiplayer(): void {
+    const state = this.multiplayerState
+    const status = this.q<HTMLElement>('.mp-status')
+    status.dataset.state = state.status
+    this.q('.mp-status-text').textContent = state.error ? `${state.message} ${state.error}` : state.message
+    this.q('.mp-room-live').textContent = state.room ? `ROOM ${state.room}` : ''
+    const roster = this.q('.mp-roster')
+    roster.innerHTML = state.players.length
+      ? state.players.map(player => `<li><i class="mp-player-dot"></i><span></span>${player.isSelf ? '<em>YOU</em>' : ''}</li>`).join('')
+      : `<li class="mp-empty">${this.i18n.t('multiplayer.empty')}</li>`
+    state.players.forEach((player, index) => {
+      const name = roster.querySelectorAll('li span')[index]
+      if (name) name.textContent = player.name
+    })
+    const connected = state.status === 'connected'
+    this.q<HTMLButtonElement>('.mp-connect').disabled = connected || state.status === 'loading' || state.status === 'connecting'
+    this.q<HTMLButtonElement>('.mp-leave').disabled = !connected && state.status !== 'connecting'
   }
 
   // ─── HUD ────────────────────────────────────────────────────────────────
@@ -312,6 +342,12 @@ export class Ui {
       case 'resume': this.actions.resume(); break
       case 'restart': this.actions.restart(); break
       case 'quit': this.actions.quit(); break
+      case 'multiplayer': this.push('multiplayer'); break
+      case 'multiplayer-join': {
+        this.actions.multiplayerJoin(this.q<HTMLInputElement>('.mp-room-input').value, this.q<HTMLInputElement>('.mp-name-input').value)
+        break
+      }
+      case 'multiplayer-leave': this.actions.multiplayerLeave(); break
       case 'settings': this.push('settings'); break
       case 'leaderboard': this.push('leaderboard'); break
       case 'back': this.back(); break
@@ -414,6 +450,7 @@ export class Ui {
     this.renderHint()
     if (this.screen === 'title') this.renderBest()
     if (this.screen === 'leaderboard') this.renderLeaderboard()
+    if (this.screen === 'multiplayer') this.renderMultiplayer()
     this.hudCache.clear()
     document.title = this.i18n.t('game.title')
   }
@@ -464,11 +501,34 @@ export class Ui {
     <p class="tagline" data-i18n="game.tagline"></p>
     <nav class="menu">
       <button data-nav class="btn btn-primary" data-action="play"><span data-i18n="menu.play"></span></button>
+      <button data-nav class="btn" data-action="multiplayer"><span data-i18n="menu.coop"></span></button>
       <button data-nav class="btn" data-action="leaderboard"><span data-i18n="menu.leaderboard"></span></button>
       <button data-nav class="btn" data-action="settings"><span data-i18n="menu.settings"></span></button>
     </nav>
   </div>
   <footer class="bottom-bar"><div class="prompts"></div><small data-i18n="credits.fonts"></small></footer>
+</section>
+
+<section class="screen screen-multiplayer screen-modal" data-screen="multiplayer">
+  <div class="modal modal-multiplayer">
+    <div class="mp-kicker" data-i18n="multiplayer.kicker"></div>
+    <h2 class="modal-title" data-i18n="multiplayer.title"></h2>
+    <p class="mp-subtitle" data-i18n="multiplayer.subtitle"></p>
+    <div class="mp-room-live"></div>
+    <div class="mp-fields">
+      <label><span data-i18n="multiplayer.room"></span><input data-nav class="mp-room-input" maxlength="16" autocomplete="off" spellcheck="false" placeholder="NOVA-01" data-i18n-placeholder="multiplayer.roomPlaceholder"></label>
+      <label><span data-i18n="multiplayer.callsign"></span><input data-nav class="mp-name-input" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Récupérateur" data-i18n-placeholder="multiplayer.callsignPlaceholder"></label>
+    </div>
+    <div class="mp-status" data-state="idle"><i></i><span class="mp-status-text"></span></div>
+    <div class="mp-roster-title"><span data-i18n="multiplayer.crew"></span><b>4 MAX</b></div>
+    <ol class="mp-roster"></ol>
+    <nav class="menu menu-row mp-actions">
+      <button data-nav class="btn btn-primary mp-connect" data-action="multiplayer-join"><span data-i18n="multiplayer.join"></span></button>
+      <button data-nav class="btn mp-leave" data-action="multiplayer-leave"><span data-i18n="multiplayer.leave"></span></button>
+      <button data-nav class="btn" data-action="back"><span data-i18n="multiplayer.back"></span></button>
+    </nav>
+  </div>
+  <footer class="bottom-bar"><div class="prompts"></div><small data-i18n="multiplayer.footer"></small></footer>
 </section>
 
 <section class="screen screen-hud" data-screen="hud">

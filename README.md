@@ -1,8 +1,8 @@
-# game-3d starter (three.js + Rapier)
+# ORBITAL OUTPOST (three.js + Rapier)
 
-A complete, small 3D game — **Sky Cores**: run, jump and dash across floating islands to collect
-every energy core before the clock runs out, avoiding patrol drones. It exists to be *changed*:
-the engine layer is fixed scaffolding, the game layer is the part you rewrite.
+ORBITAL OUTPOST is a 3D recovery game: run, jump and dash across a modular orbital outpost while
+collecting every energy core before reactor overload. The title menu includes a live co-op room
+screen connected to the Cloudflare Worker in `server/`.
 
 ```bash
 pnpm install
@@ -30,8 +30,10 @@ pnpm smoke    # after build: headless browser playthrough + screenshots in shots
 | `src/game/world.ts` | Level layout, sky, lights, islands, stones, lifts | Yes |
 | `src/game/player.ts` | Character controller + game feel + procedural model | Yes |
 | `src/game/*.ts` | Camera, cores, drones, particles, scene orchestration | Yes |
-| `src/ui/`, `src/styles/main.css` | HTML/CSS title, HUD, pause, settings, results | Yes |
+| `src/ui/`, `src/styles/main.css` | HTML/CSS title, co-op room, HUD, pause, settings, results | Yes |
 | `src/i18n/*.json` | All player-facing text (both files, same keys) | Yes |
+| `src/net/multiplayer.ts` | Public bootstrap loading, WSS connection and room presence | Yes |
+| `server/` | Cloudflare Worker and Durable Object room service | Yes |
 
 ## Rules for changes
 
@@ -54,6 +56,19 @@ pnpm smoke    # after build: headless browser playthrough + screenshots in shots
 Keyboard/mouse: WASD move, mouse look (click to capture), Space jump (hold = higher), Shift
 sprint, F or left click dash, Esc pause. Gamepad: left stick, right stick, A jump, X/RB dash,
 LB sprint, Start pause. Touch: left-side stick, right-side drag to look, JUMP / DASH buttons.
+
+## Co-op test
+
+Choose **Co-op** from the title menu, enter the same room code in two browser tabs and give each
+tab a different callsign. The client loads `public/multiplayer/bootstrap.json`, connects to the
+published WSS endpoint, and shows the two-player presence state. A missing configuration, an
+incompatible build or a closed socket is shown as an unavailable state; the client never fakes an
+online match.
+
+The current Cloudflare service exposes `/health` for diagnostics and `/ws?room=ROOM` for the room
+connection. It relays validated join, leave, pose and action packets through one Durable Object per
+room. Shared tactical turns, authoritative objectives and reconnect credentials remain the next
+multiplayer milestone; this version intentionally delivers the connection and presence slice first.
 
 ## Credits
 

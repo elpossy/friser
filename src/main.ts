@@ -5,6 +5,7 @@ import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore, type SaveData } from './engine/save'
 import type { Game } from './game/game'
+import { MultiplayerClient } from './net/multiplayer'
 import { TouchControls } from './ui/touch'
 import { Ui } from './ui/ui'
 
@@ -49,7 +50,9 @@ async function boot(): Promise<void> {
     input.lockPointer()
   }
 
-  const ui = new Ui(i18n, save, audio, input, {
+  let ui!: Ui
+  const multiplayer = new MultiplayerClient(state => ui?.setMultiplayerState(state))
+  ui = new Ui(i18n, save, audio, input, {
     play: () => startRun(!save.data.tutorialDone),
     restart: () => startRun(false),
     resume,
@@ -58,6 +61,8 @@ async function boot(): Promise<void> {
       ui.show('title')
       input.unlockPointer()
     },
+    multiplayerJoin: (room, name) => { void multiplayer.connect(room, name) },
+    multiplayerLeave: () => multiplayer.disconnect(),
     settings: patch => {
       const qualityChanged = patch.quality !== undefined && patch.quality !== save.data.quality
       save.update(patch)
@@ -132,6 +137,7 @@ async function boot(): Promise<void> {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pause()
   })
+  window.addEventListener('beforeunload', () => multiplayer.disconnect(false))
   window.addEventListener('game:pause', pause)
   canvas.addEventListener('click', () => {
     if (g.mode === 'playing') input.lockPointer()

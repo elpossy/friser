@@ -1,0 +1,6 @@
+{
+  "build": "orbitaloutpost-mp-v1",
+  "signalingUrl": "wss://orbitaloutpost-mp.bossyfaycal5.workers.dev/ws",
+  "healthUrl": "https://orbitaloutpost-mp.bossyfaycal5.workers.dev/health",
+  "maxPlayers": 4
+}
